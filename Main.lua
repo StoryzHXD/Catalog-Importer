@@ -1,6 +1,8 @@
 local AssetService = game:GetService("AssetService")
+local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local Selection = game:GetService("Selection")
+local TweenService = game:GetService("TweenService")
 
 local PLUGIN_ID = "CatalogImporter_Widget_v1"
 local DEFAULT_BUNDLE_ID = "52488952982257"
@@ -239,8 +241,111 @@ local subtitle = create("TextLabel", {
 	TextYAlignment = Enum.TextYAlignment.Top,
 }, header)
 
-local inputCard = makeCard("BundleInputCard", 2, 100, scrollFrame, colors.panel)
+local categoryCard = makeCard("CategorySelector", 2, 104, scrollFrame, colors.panel)
+addGradient(categoryCard, Color3.fromRGB(255, 255, 255), Color3.fromRGB(243, 240, 255), 90)
+
 create("TextLabel", {
+	Name = "CategoryHeading",
+	Position = UDim2.fromOffset(13, 8),
+	Size = UDim2.new(1, -26, 0, 17),
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamBlack,
+	Text = "ESCOLHA SUA MISSÃO",
+	TextColor3 = colors.text,
+	TextSize = 10,
+	TextXAlignment = Enum.TextXAlignment.Left,
+}, categoryCard)
+
+local function createCategoryTab(name, titleText, description, iconText, order, baseColor, accentColor)
+	local tab = create("TextButton", {
+		Name = name,
+		LayoutOrder = order,
+		Position = UDim2.new((order - 1) * 0.5, 0, 0, 0),
+		Size = UDim2.new(0.5, -5, 0, 64),
+		BackgroundColor3 = colors.panelTint,
+		BorderSizePixel = 0,
+		AutoButtonColor = false,
+		Text = "",
+	}, categoryCard)
+	addCorner(tab, 13)
+	local stroke = addStroke(tab, colors.stroke, 1.6, 0.35)
+	local gradient = addGradient(tab, baseColor:Lerp(Color3.new(1, 1, 1), 0.35), colors.panelTint, 0)
+
+	local icon = create("Frame", {
+		Name = "IconSticker",
+		Position = UDim2.fromOffset(8, 10),
+		Size = UDim2.fromOffset(43, 43),
+		BackgroundColor3 = accentColor,
+		BorderSizePixel = 0,
+		Rotation = -4,
+	}, tab)
+	addCorner(icon, 12)
+	addStroke(icon, colors.ink, 1.8, 0.08)
+	addGradient(icon, accentColor:Lerp(Color3.new(1, 1, 1), 0.17), accentColor, 90)
+	create("TextLabel", {
+		Name = "IconText",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBlack,
+		Text = iconText,
+		TextColor3 = colors.ink,
+		TextSize = 17,
+		Rotation = 4,
+	}, icon)
+
+	create("TextLabel", {
+		Name = "TabTitle",
+		Position = UDim2.fromOffset(59, 12),
+		Size = UDim2.new(1, -66, 0, 18),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBlack,
+		Text = titleText,
+		TextColor3 = colors.text,
+		TextSize = 12,
+		TextXAlignment = Enum.TextXAlignment.Left,
+	}, tab)
+	create("TextLabel", {
+		Name = "TabDescription",
+		Position = UDim2.fromOffset(59, 31),
+		Size = UDim2.new(1, -66, 0, 23),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamMedium,
+		Text = description,
+		TextColor3 = colors.muted,
+		TextSize = 9,
+		TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+	}, tab)
+
+	local selectedDot = create("Frame", {
+		Name = "SelectedDot",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -7, 0, 7),
+		Size = UDim2.fromOffset(8, 8),
+		BackgroundColor3 = colors.mint,
+		BorderSizePixel = 0,
+		Visible = false,
+	}, tab)
+	addCorner(selectedDot, 20)
+	addStroke(selectedDot, colors.ink, 1, 0.15)
+
+	return tab, stroke, gradient, icon, selectedDot
+end
+
+local assetTab, assetTabStroke, assetTabGradient, assetTabIcon, assetSelectedDot = createCategoryTab(
+	"AssetCategory", "ASSET", "Item único • modelo • acessório", "3D", 1, colors.blue, colors.yellow
+)
+local bundleTab, bundleTabStroke, bundleTabGradient, bundleTabIcon, bundleSelectedDot = createCategoryTab(
+	"BundleCategory", "BUNDLE", "Avatar completo • rig • peças", "B+", 2, colors.purple, colors.pink
+)
+assetTab.Position = UDim2.fromOffset(12, 31)
+assetTab.Size = UDim2.new(0.5, -17, 0, 64)
+bundleTab.Position = UDim2.new(0.5, 5, 0, 31)
+bundleTab.Size = UDim2.new(0.5, -17, 0, 64)
+
+local inputCard = makeCard("CatalogInputCard", 3, 100, scrollFrame, colors.panel)
+local inputTitle = create("TextLabel", {
 	Name = "InputTitle",
 	Position = UDim2.fromOffset(13, 10),
 	Size = UDim2.new(1, -26, 0, 20),
@@ -277,7 +382,7 @@ create("UIPadding", {
 
 local buttonRow = create("Frame", {
 	Name = "PrimaryActions",
-	LayoutOrder = 3,
+	LayoutOrder = 4,
 	Size = UDim2.new(1, 0, 0, 52),
 	BackgroundTransparency = 1,
 }, scrollFrame)
@@ -307,13 +412,16 @@ local function createButton(name, text, color, parent, layoutOrder, secondColor)
 	addGradient(button, secondColor or color:Lerp(Color3.new(1, 1, 1), 0.12), color:Lerp(Color3.new(0, 0, 0), 0.05), 90)
 
 	local baseColor = color
+	local hoverTweenInfo = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	button.MouseEnter:Connect(function()
 		if button.Active then
-			button.BackgroundColor3 = baseColor:Lerp(Color3.new(1, 1, 1), 0.12)
+			TweenService:Create(button, hoverTweenInfo, {
+				BackgroundColor3 = baseColor:Lerp(Color3.new(1, 1, 1), 0.14),
+			}):Play()
 		end
 	end)
 	button.MouseLeave:Connect(function()
-		button.BackgroundColor3 = baseColor
+		TweenService:Create(button, hoverTweenInfo, { BackgroundColor3 = baseColor }):Play()
 	end)
 
 	return button
@@ -333,7 +441,7 @@ local rawButton = createButton(
 rawButton.Size = UDim2.new(1, 0, 0, 46)
 rawButton.TextSize = 11
 
-local detailsPanel = makeCard("DetailsPanel", 5, 177, scrollFrame, colors.panelTint)
+local detailsPanel = makeCard("DetailsPanel", 6, 177, scrollFrame, colors.panelTint)
 addGradient(detailsPanel, Color3.fromRGB(255, 255, 255), Color3.fromRGB(243, 239, 255), 90)
 
 create("TextLabel", {
@@ -351,7 +459,7 @@ local detailsIcon = detailsPanel:FindFirstChild("DetailsIcon")
 addCorner(detailsIcon, 8)
 addStroke(detailsIcon, colors.ink, 1.2, 0.15)
 
-create("TextLabel", {
+local detailsTitle = create("TextLabel", {
 	Name = "DetailsTitle",
 	Position = UDim2.fromOffset(47, 11),
 	Size = UDim2.new(1, -145, 0, 24),
@@ -393,7 +501,7 @@ local detailsText = create("TextLabel", {
 	TextYAlignment = Enum.TextYAlignment.Top,
 }, detailsPanel)
 
-local statusPanel = makeCard("StatusPanel", 6, 78, scrollFrame, Color3.fromRGB(255, 255, 255))
+local statusPanel = makeCard("StatusPanel", 7, 78, scrollFrame, Color3.fromRGB(255, 255, 255))
 addStroke(statusPanel, colors.purple, 1.6, 0.48)
 
 local statusPill = create("Frame", {
@@ -434,7 +542,7 @@ local statusText = create("TextLabel", {
 
 local footer = create("TextLabel", {
 	Name = "Footer",
-	LayoutOrder = 7,
+	LayoutOrder = 8,
 	Size = UDim2.new(1, 0, 0, 23),
 	BackgroundTransparency = 1,
 	Font = Enum.Font.GothamBold,
@@ -445,6 +553,8 @@ local footer = create("TextLabel", {
 }, scrollFrame)
 
 local lastBundle = nil
+local lastAsset = nil
+local selectedCategory = "Bundle"
 local busy = false
 
 local function setStatus(message, color)
@@ -460,23 +570,99 @@ local function setStatus(message, color)
 	end
 end
 
+local function setCategory(category)
+	if busy then
+		return
+	end
+
+	selectedCategory = category == "Asset" and "Asset" or "Bundle"
+	local assetMode = selectedCategory == "Asset"
+
+	local assetFill = assetMode and Color3.fromRGB(193, 224, 255) or Color3.fromRGB(244, 241, 255)
+	local bundleFill = not assetMode and Color3.fromRGB(220, 204, 255) or Color3.fromRGB(244, 241, 255)
+	local assetStroke = assetMode and colors.blue or Color3.fromRGB(199, 190, 225)
+	local bundleStroke = not assetMode and colors.purple or Color3.fromRGB(199, 190, 225)
+
+	assetTab.BackgroundColor3 = assetFill
+	bundleTab.BackgroundColor3 = bundleFill
+	assetTabStroke.Color = assetStroke
+	bundleTabStroke.Color = bundleStroke
+	assetTabStroke.Thickness = assetMode and 2.8 or 1.4
+	bundleTabStroke.Thickness = not assetMode and 2.8 or 1.4
+	assetTabStroke.Transparency = assetMode and 0.02 or 0.45
+	bundleTabStroke.Transparency = not assetMode and 0.02 or 0.45
+	assetTabGradient.Color = ColorSequence.new(
+		assetMode and Color3.fromRGB(172, 214, 255) or Color3.fromRGB(255, 255, 255),
+		assetMode and Color3.fromRGB(225, 241, 255) or Color3.fromRGB(240, 237, 255)
+	)
+	bundleTabGradient.Color = ColorSequence.new(
+		not assetMode and Color3.fromRGB(205, 174, 255) or Color3.fromRGB(255, 255, 255),
+		not assetMode and Color3.fromRGB(255, 222, 240) or Color3.fromRGB(240, 237, 255)
+	)
+	assetTabIcon.BackgroundColor3 = assetMode and colors.yellow or Color3.fromRGB(222, 218, 240)
+	bundleTabIcon.BackgroundColor3 = not assetMode and colors.pink or Color3.fromRGB(222, 218, 240)
+	assetSelectedDot.Visible = assetMode
+	bundleSelectedDot.Visible = not assetMode
+
+	inputTitle.Text = assetMode and "01   /   QUAL ASSET VAMOS PUXAR?" or "01   /   QUAL BUNDLE VAMOS BUSCAR?"
+	input.PlaceholderText = assetMode and "Cole URL /catalog/ID ou ID do asset..." or "Cole URL /bundles/ID ou ID do bundle..."
+	inspectButton.Text = assetMode and "◉  Ver asset" or "◉  Ver bundle"
+	importRigButton.Text = assetMode and "✦  Importar asset" or "✦  Criar personagem"
+	rawButton.Visible = not assetMode
+	detailsTitle.Text = assetMode and "RESUMO DO ASSET" or "RESUMO DO BUNDLE"
+
+	if assetMode and input.Text == DEFAULT_BUNDLE_ID then
+		input.Text = ""
+	elseif not assetMode and input.Text == "" then
+		input.Text = DEFAULT_BUNDLE_ID
+	end
+
+	if assetMode then
+		detailsBadge.Text = "ASSET MODE"
+		detailsText.Text = "Asset: ainda não consultado\n\nCole o ID de um item individual para ver seus detalhes e importá-lo para o Workspace."
+		setStatus("Modo Asset ativado! Cole o ID de um modelo, acessório ou outro asset compatível.", colors.blue)
+	else
+		detailsBadge.Text = "BUNDLE MODE"
+		detailsText.Text = "Bundle: ainda não consultado\n\nInspecione os itens do pacote ou gere um personagem usando a descrição do avatar."
+		setStatus("Modo Bundle ativado! Cole o ID de um bundle para inspecionar ou gerar um rig.", colors.purple)
+	end
+end
+
 local function setBusy(value)
 	busy = value
 	inspectButton.Active = not value
 	importRigButton.Active = not value
 	rawButton.Active = not value
+	assetTab.Active = not value
+	bundleTab.Active = not value
 	input.Active = not value
 	inspectButton.AutoButtonColor = false
 	importRigButton.AutoButtonColor = false
 	rawButton.AutoButtonColor = false
-	importRigButton.Text = value and "◌  CRIANDO..." or "✦  Criar personagem"
-	inspectButton.Text = value and "◌  AGUARDE..." or "◉  Ver bundle"
+	importRigButton.Text = value and "◌  PROCESSANDO..." or (selectedCategory == "Asset" and "✦  Importar asset" or "✦  Criar personagem")
+	inspectButton.Text = value and "◌  AGUARDE..." or (selectedCategory == "Asset" and "◉  Ver asset" or "◉  Ver bundle")
 	rawButton.Text = value and "PROCESSANDO ASSETS..." or "▦  Importar peças de origem · AVANCADO"
 end
 
 local function parseBundleId(text)
 	text = tostring(text or "")
 	local id = string.match(text, "[Bb]undles/(%d+)")
+	if not id then
+		id = string.match(text, "^%s*(%d+)%s*$")
+	end
+
+	local number = tonumber(id)
+	if number and number > 0 and number % 1 == 0 then
+		return number
+	end
+	return nil
+end
+
+local function parseAssetId(text)
+	text = tostring(text or "")
+	local id = string.match(text, "[Cc]atalog/(%d+)")
+		or string.match(text, "[Aa]ssets?/(%d+)")
+		or string.match(text, "[Ll]ibrary/(%d+)")
 	if not id then
 		id = string.match(text, "^%s*(%d+)%s*$")
 	end
@@ -600,7 +786,85 @@ local function getBundleDetails(bundleId)
 	return bundle
 end
 
-local function getImportCFrame()
+local getImportCFrame
+
+local function truncateText(value, maxLength)
+	value = tostring(value or "")
+	if #value > maxLength then
+		return string.sub(value, 1, maxLength - 3) .. "..."
+	end
+	return value
+end
+
+local function formatAssetDetails(info, assetId)
+	local creator = info.Creator
+	if type(creator) == "table" then
+		creator = creator.Name or creator.Id or "Desconhecido"
+	end
+
+	local lines = {
+		"Asset: " .. tostring(info.Name or ("Asset_" .. assetId)),
+		"ID: " .. tostring(info.AssetId or assetId),
+		"Tipo: " .. tostring(info.AssetTypeId or "desconhecido"),
+		"Criador: " .. tostring(creator or "Desconhecido"),
+	}
+
+	local description = truncateText(info.Description, 125)
+	if description ~= "" then
+		table.insert(lines, "")
+		table.insert(lines, description)
+	end
+
+	return table.concat(lines, "\n")
+end
+
+local function getAssetDetails(assetId)
+	local info = MarketplaceService:GetProductInfoAsync(assetId, Enum.InfoType.Asset)
+	if type(info) ~= "table" then
+		error("A API do Roblox não retornou detalhes válidos para esse asset.")
+	end
+
+	lastAsset = info
+	detailsBadge.Text = "ASSET OK"
+	detailsBadge.BackgroundColor3 = colors.yellow
+	detailsText.Text = formatAssetDetails(info, assetId)
+	return info
+end
+
+local function importAsset(assetId)
+	local productInfo
+	local infoSuccess, infoOrError = pcall(function()
+		return MarketplaceService:GetProductInfoAsync(assetId, Enum.InfoType.Asset)
+	end)
+	if infoSuccess then
+		productInfo = infoOrError
+	end
+
+	local success, loadedOrError = pcall(function()
+		return AssetService:LoadAssetAsync(assetId)
+	end)
+	if not success or not loadedOrError then
+		error("Não foi possível carregar o asset " .. tostring(assetId) .. ". Verifique se é um asset carregável e se as permissões de assets de terceiros estão habilitadas. Detalhe: " .. tostring(loadedOrError))
+	end
+
+	local model = loadedOrError
+	local modelName = (productInfo and productInfo.Name) or ("Asset_" .. tostring(assetId))
+	model.Name = tostring(modelName)
+	model:PivotTo(getImportCFrame())
+	model.Parent = workspace
+	Selection:Set({ model })
+
+	if productInfo then
+		lastAsset = productInfo
+		detailsBadge.Text = "IMPORTADO"
+		detailsBadge.BackgroundColor3 = colors.mint
+		detailsText.Text = formatAssetDetails(productInfo, assetId)
+	end
+
+	return model, modelName, productInfo
+end
+
+getImportCFrame = function()
 	local camera = workspace.CurrentCamera
 	if camera then
 		local position = camera.CFrame.Position + camera.CFrame.LookVector * 12
@@ -743,12 +1007,20 @@ local function importPartsSeparately(bundleId)
 	return folder, successes, #assetItems, failures, bundle
 end
 
-local function getInputBundleId()
-	local bundleId = parseBundleId(input.Text)
-	if not bundleId then
-		error("Insira um ID numérico ou uma URL contendo /bundles/ID.")
+local function getInputCatalogId()
+	local catalogId
+	if selectedCategory == "Asset" then
+		catalogId = parseAssetId(input.Text)
+		if not catalogId then
+			error("Insira um ID numérico ou uma URL de catálogo contendo /catalog/ID.")
+		end
+	else
+		catalogId = parseBundleId(input.Text)
+		if not catalogId then
+			error("Insira um ID numérico ou uma URL contendo /bundles/ID.")
+		end
 	end
-	return bundleId
+	return catalogId
 end
 
 local function runAction(button, callback)
@@ -756,20 +1028,23 @@ local function runAction(button, callback)
 		return
 	end
 
-	local ok, bundleIdOrError = pcall(getInputBundleId)
+	local ok, catalogIdOrError = pcall(getInputCatalogId)
 	if not ok then
-		setStatus(bundleIdOrError, colors.red)
+		setStatus(catalogIdOrError, colors.red)
 		return
 	end
 
 	setBusy(true)
-	setStatus("Consultando o catálogo do Roblox...")
+	setStatus(selectedCategory == "Asset" and "Consultando o asset no catálogo..." or "Consultando o bundle do Roblox...")
 
 	task.spawn(function()
-		local success, resultA, resultB, resultC, resultD, resultE = pcall(callback, bundleIdOrError)
+		local categoryAtStart = selectedCategory
+		local success, resultA, resultB, resultC, resultD, resultE = pcall(callback, catalogIdOrError)
 		if success then
 			if button == inspectButton then
-				setStatus("Bundle consultado com sucesso.", colors.green)
+				setStatus(categoryAtStart == "Asset" and "Asset consultado com sucesso." or "Bundle consultado com sucesso.", colors.green)
+			elseif button == importRigButton and categoryAtStart == "Asset" then
+				setStatus("Asset importado: " .. tostring(resultB or resultA.Name), colors.green)
 			elseif button == importRigButton then
 				setStatus("Rig importado: " .. resultA.Name .. "\nOrigem: " .. tostring(resultB), colors.green)
 			elseif button == rawButton then
@@ -781,7 +1056,7 @@ local function runAction(button, callback)
 					end
 				end
 				setStatus(message, colors.green)
-			end
+		end
 		else
 			warn("[Catalog Importer] " .. tostring(resultA))
 			setStatus(tostring(resultA), colors.red)
@@ -791,19 +1066,36 @@ local function runAction(button, callback)
 	end)
 end
 
+assetTab.Activated:Connect(function()
+	setCategory("Asset")
+end)
+
+bundleTab.Activated:Connect(function()
+	setCategory("Bundle")
+end)
+
 inspectButton.Activated:Connect(function()
-	runAction(inspectButton, function(bundleId)
-		return getBundleDetails(bundleId)
+	runAction(inspectButton, function(catalogId)
+		if selectedCategory == "Asset" then
+			return getAssetDetails(catalogId)
+		end
+		return getBundleDetails(catalogId)
 	end)
 end)
 
 importRigButton.Activated:Connect(function()
-	runAction(importRigButton, importAsRig)
+	if selectedCategory == "Asset" then
+		runAction(importRigButton, importAsset)
+	else
+		runAction(importRigButton, importAsRig)
+	end
 end)
 
 rawButton.Activated:Connect(function()
 	runAction(rawButton, importPartsSeparately)
 end)
+
+setCategory("Bundle")
 
 toggleButton.Click:Connect(function()
 	widget.Enabled = not widget.Enabled
